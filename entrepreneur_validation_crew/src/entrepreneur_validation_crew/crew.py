@@ -1,51 +1,49 @@
-from crewai import Agent, Crew, Process, Task
-from crewai.project import CrewBase, agent, crew, task
+from crewai import Crew, Task, Agent
+from crewai.project.crew_base import CrewBase
+import yaml
 
-# Uncomment the following line to use an example of a custom tool
-# from entrepreneur_validation_crew.tools.custom_tool import MyCustomTool
+class EntrepreneurValidationCrew(CrewBase):
+    def __init__(self, tasks_config=None):
+        super().__init__()
+        self.tasks_config = tasks_config or self.load_default_config()
 
-# Check our tools documentations for more information on how to use them
-# from crewai_tools import SerperDevTool
+    def load_default_config(self):
+        # Load default configuration if none is provided
+        with open('config/tasks.yaml', 'r') as file:
+            return yaml.safe_load(file)
 
-@CrewBase
-class EntrepreneurValidationCrewCrew():
-	"""EntrepreneurValidationCrew crew"""
+    def crew(self):
+        # Create agents
+        agents = self.create_agents()
 
-	@agent
-	def researcher(self) -> Agent:
-		return Agent(
-			config=self.agents_config['researcher'],
-			# tools=[MyCustomTool()], # Example of custom tool, loaded on the beginning of file
-			verbose=True
-		)
+        # Create tasks
+        tasks = self.create_tasks(agents)
 
-	@agent
-	def reporting_analyst(self) -> Agent:
-		return Agent(
-			config=self.agents_config['reporting_analyst'],
-			verbose=True
-		)
+        # Create the crew
+        crew = Crew(
+            agents=agents,
+            tasks=tasks,
+            verbose=True
+        )
 
-	@task
-	def research_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['research_task'],
-		)
+        return crew
 
-	@task
-	def reporting_task(self) -> Task:
-		return Task(
-			config=self.tasks_config['reporting_task'],
-			output_file='report.md'
-		)
+    def create_agents(self):
+        # Implement agent creation logic here
+        # You might want to load this from a config file as well
+        pass
 
-	@crew
-	def crew(self) -> Crew:
-		"""Creates the EntrepreneurValidationCrew crew"""
-		return Crew(
-			agents=self.agents, # Automatically created by the @agent decorator
-			tasks=self.tasks, # Automatically created by the @task decorator
-			process=Process.sequential,
-			verbose=True,
-			# process=Process.hierarchical, # In case you wanna use that instead https://docs.crewai.com/how-to/Hierarchical/
-		)
+    def create_tasks(self, agents):
+        # Create tasks based on the tasks_config
+        tasks = []
+        for task_config in self.tasks_config['tasks']:
+            task = Task(
+                description=task_config['description'],
+                agent=agents[task_config['agent']],
+                # Add other task parameters as needed
+            )
+            tasks.append(task)
+        return tasks
+
+    def kickoff(self, inputs):
+        return self.crew().kickoff(inputs=inputs)
