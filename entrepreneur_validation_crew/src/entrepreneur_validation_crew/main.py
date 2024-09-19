@@ -1,31 +1,26 @@
 #!/usr/bin/env python
 import sys
 import os
-import yaml
 
-# Use relative import for crew
-from .crew import EntrepreneurValidationCrew
+# Add the src directory to the Python path
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-def load_config(file_path):
-    with open(file_path, 'r') as file:
-        return yaml.safe_load(file)
+from entrepreneur_validation_crew.crew import EntrepreneurValidationCrew
+
+
+# This main file is intended to be a way for your to run your
+# crew locally, so refrain from adding unnecessary logic into this file.
+# Replace with inputs you want to test with, it will automatically
+# interpolate any tasks and agents information
+
 
 def run():
-    # Load tasks configuration
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    tasks_config = load_config(os.path.join(current_dir, 'config', 'tasks.yaml'))
-    
-    # Prepare inputs (you might want to adjust this based on your actual input structure)
-    inputs = {
-        "business_idea": "A subscription box for exotic fruits",
-        "target_audience": "Health-conscious foodies",
-        "unique_value_proposition": "Discover rare fruits from around the world, delivered monthly"
-    }
-    
-    # Create and run the crew
-    crew = EntrepreneurValidationCrew(tasks_config=tasks_config)
-    result = crew.kickoff(inputs=inputs)
-    print(result)
+    """
+    Run the crew.
+    """
+    inputs = {"topic": "AI LLMs"}
+    EntrepreneurValidationCrew().crew().kickoff(inputs=inputs)
+
 
 def train():
     """
@@ -34,7 +29,7 @@ def train():
     inputs = {"topic": "AI LLMs"}
     try:
         EntrepreneurValidationCrew().crew().train(
-            n_iterations=int(sys.argv[1]), filename=sys.argv[2], inputs=inputs
+            n_iterations=int(sys.argv[2]), filename=sys.argv[3], inputs=inputs
         )
 
     except Exception as e:
@@ -46,7 +41,7 @@ def replay():
     Replay the crew execution from a specific task.
     """
     try:
-        EntrepreneurValidationCrew().crew().replay(task_id=sys.argv[1])
+        EntrepreneurValidationCrew().crew().replay(task_id=sys.argv[2])
 
     except Exception as e:
         raise Exception(f"An error occurred while replaying the crew: {e}")
@@ -54,12 +49,17 @@ def replay():
 
 def test():
     """
-    Test the crew execution and return the results.
+    Test the crew execution and return the results using GPT-4o-mini model.
     """
     inputs = {"topic": "AI LLMs"}
     try:
+        import os
+        os.environ["OPENAI_API_KEY"] = "your-api-key-here"  # Set the API key explicitly for testing
+        
         EntrepreneurValidationCrew().crew().test(
-            n_iterations=int(sys.argv[1]), openai_model_name=sys.argv[2], inputs=inputs
+            n_iterations=int(sys.argv[2]),
+            openai_model_name="gpt-4o-mini",  # Updated to use GPT-4o-mini model
+            inputs=inputs,
         )
 
     except Exception as e:
@@ -72,10 +72,19 @@ if __name__ == "__main__":
     elif sys.argv[1] == "run":
         run()
     elif sys.argv[1] == "train":
-        train()
+        if len(sys.argv) < 4:
+            print("Usage: python main.py train <n_iterations> <filename>")
+        else:
+            train()
     elif sys.argv[1] == "replay":
-        replay()
+        if len(sys.argv) < 3:
+            print("Usage: python main.py replay <task_id>")
+        else:
+            replay()
     elif sys.argv[1] == "test":
-        test()
+        if len(sys.argv) < 3:
+            print("Usage: python main.py test <n_iterations>")
+        else:
+            test()
     else:
         print("Invalid command.")

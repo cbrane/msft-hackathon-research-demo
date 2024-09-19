@@ -1,49 +1,101 @@
-from crewai import Crew, Task, Agent
-from crewai.project.crew_base import CrewBase
-import yaml
+from crewai import Agent, Crew, Process, Task
+from crewai.project import CrewBase, agent, crew, task
+import os
+from dotenv import load_dotenv
 
-class EntrepreneurValidationCrew(CrewBase):
-    def __init__(self, tasks_config=None):
-        super().__init__()
-        self.tasks_config = tasks_config or self.load_default_config()
+# Load environment variables
+load_dotenv()
 
-    def load_default_config(self):
-        # Load default configuration if none is provided
-        with open('config/tasks.yaml', 'r') as file:
-            return yaml.safe_load(file)
+# Reddit API credentials
+client_id = os.getenv("REDDIT_CLIENT_ID")
+client_secret = os.getenv("REDDIT_CLIENT_SECRET")
+user_agent = "reddit_agent"
 
-    def crew(self):
-        # Create agents
-        agents = self.create_agents()
+# Import Reddit Search tools from langchain_community
+from langchain_community.tools.reddit_search.tool import RedditSearchRun
+from langchain_community.tools.reddit_search.tool import RedditSearchSchema
+from langchain_community.utilities.reddit_search import RedditSearchAPIWrapper
 
-        # Create tasks
-        tasks = self.create_tasks(agents)
+# For Twitter scraping (using Selenium & BeautifulSoup)
+from selenium import webdriver
+from bs4 import BeautifulSoup
+import time
 
-        # Create the crew
-        crew = Crew(
-            agents=agents,
-            tasks=tasks,
-            verbose=True
+
+@CrewBase
+class EntrepreneurValidationCrew:
+    """EntrepreneurValidationCrew crew"""
+
+    @agent
+    def controller_agent(self) -> Agent:
+        return Agent(config=self.agents_config["controller_agent"])
+
+    @agent
+    def reddit_agent(self) -> Agent:
+        reddit_search = RedditSearchRun(
+            api_wrapper=RedditSearchAPIWrapper(
+                reddit_client_id=client_id,
+                reddit_client_secret=client_secret,
+                reddit_user_agent=user_agent,
+            )
+        )
+        return Agent(
+            config=self.agents_config["reddit_agent"],
+            tools=[reddit_search],
+            verbose=True,
         )
 
-        return crew
+    @agent
+    def twitter_agent(self) -> Agent:
+        return Agent(config=self.agents_config["twitter_agent"])
 
-    def create_agents(self):
-        # Implement agent creation logic here
-        # You might want to load this from a config file as well
-        pass
+    @agent
+    def report_agent(self) -> Agent:
+        return Agent(config=self.agents_config["report_agent"])
 
-    def create_tasks(self, agents):
-        # Create tasks based on the tasks_config
-        tasks = []
-        for task_config in self.tasks_config['tasks']:
-            task = Task(
-                description=task_config['description'],
-                agent=agents[task_config['agent']],
-                # Add other task parameters as needed
-            )
-            tasks.append(task)
-        return tasks
+    @task
+    def gather_input_task(self) -> Task:
+        return Task(config=self.tasks_config["gather_input_task"])
 
-    def kickoff(self, inputs):
-        return self.crew().kickoff(inputs=inputs)
+    @task
+    def reddit_search_task(self) -> Task:
+        return Task(config=self.tasks_config["reddit_search_task"])
+
+    @task
+    def twitter_scraping_task(self) -> Task:
+        return Task(config=self.tasks_config["twitter_scraping_task"])
+
+    @task
+    def generate_report_task(self) -> Task:
+        return Task(config=self.tasks_config["generate_report_task"])
+
+    @crew
+    def crew(self) -> Crew:
+        return Crew(
+            agents=self.agents,
+            tasks=self.tasks,
+            process=Process.sequential,
+            verbose=True,
+        )
+
+    # Twitter scraping function
+    def scrape_twitter(self, query: str):
+        driver = webdriver.Chrome(
+            executable_path="/opt/homebrew/Caskroom/chromedriver/129.0.6668.58/chromedriver-mac-arm64/chromedriver"
+        )
+        driver.get(f"https://twitter.com/search?q={query}&src=typed_query")
+        time.sleep(5)
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(5)
+
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        tweets = soup.find_all("article", {"role": "article"})
+
+        tweet_texts = []
+        for tweet in tweets:
+            tweet_content = tweet.find("div", {"lang": True})
+            if tweet_content:
+                tweet_texts.append(tweet_content.text)
+
+        driver.quit()
+        return tweet_texts
