@@ -54,8 +54,11 @@ def test():
     inputs = {"topic": "AI LLMs"}
     try:
         import os
-        os.environ["OPENAI_API_KEY"] = "your-api-key-here"  # Set the API key explicitly for testing
-        
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
         EntrepreneurValidationCrew().crew().test(
             n_iterations=int(sys.argv[2]),
             openai_model_name="gpt-4o-mini",  # Updated to use GPT-4o-mini model
